@@ -1,0 +1,236 @@
+generator client {
+  provider = "prisma-client"
+  output   = "../generated"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+// ─── Enums ────────────────────────────────────────────────────────────────────
+
+enum ClubStatus {
+  DRAFT
+  ACTIVE
+  ARCHIVED
+}
+
+enum QuestionStatus {
+  PROPOSED
+  APPROVED
+}
+
+enum MemberRole {
+  MEMBER
+  MODERATOR
+}
+
+// ─── Models ───────────────────────────────────────────────────────────────────
+
+model User {
+  id            String   @id @default(cuid())
+  name          String?
+  email         String   @unique
+  emailVerified Boolean  @default(false)
+  image         String?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  sessions     Session[]
+  accounts     Account[]
+  ownedClubs   Club[]
+  memberships  ClubMembership[]
+  questions    Question[]
+  answers      Answer[]
+  votes        Vote[]
+  memberCards  MemberCard[]
+  reactions    Reaction[]
+}
+
+model Session {
+  id        String   @id @default(cuid())
+  expiresAt DateTime
+  token     String   @unique
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  ipAddress String?
+  userAgent String?
+
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model Account {
+  id                    String    @id @default(cuid())
+  accountId             String
+  providerId            String
+  userId                String
+  user                  User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  accessToken           String?
+  refreshToken          String?
+  idToken               String?
+  accessTokenExpiresAt  DateTime?
+  refreshTokenExpiresAt DateTime?
+  scope                 String?
+  password              String?
+  createdAt             DateTime  @default(now())
+  updatedAt             DateTime  @updatedAt
+}
+
+model Verification {
+  id         String    @id @default(cuid())
+  identifier String
+  value      String
+  expiresAt  DateTime
+  createdAt  DateTime? @default(now())
+  updatedAt  DateTime? @updatedAt
+}
+
+model Club {
+  id            String     @id @default(cuid())
+  name          String
+  description   String?
+  bookTitle     String
+  bookAuthor    String
+  totalPages    Int
+  numberOfWeeks Int
+  inviteCode    String     @unique
+  status        ClubStatus @default(DRAFT)
+  startedAt     DateTime?
+  createdAt     DateTime   @default(now())
+  updatedAt     DateTime   @updatedAt
+
+  ownerId String
+  owner   User   @relation(fields: [ownerId], references: [id])
+
+  memberships   ClubMembership[]
+  readingPhases ReadingPhase[]
+
+  @@index([ownerId])
+}
+
+model ClubMembership {
+  id        String     @id @default(cuid())
+  role      MemberRole @default(MEMBER)
+  joinedAt  DateTime   @default(now())
+
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  clubId String
+  club   Club   @relation(fields: [clubId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, clubId])
+  @@index([clubId])
+}
+
+model ReadingPhase {
+  id          String    @id @default(cuid())
+  weekIndex   Int
+  description String?
+  startUnit   Int
+  endUnit     Int
+  unlockDate  DateTime?
+  isOpen      Boolean   @default(false)
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  clubId String
+  club   Club   @relation(fields: [clubId], references: [id], onDelete: Cascade)
+
+  questions   Question[]
+  memberCards MemberCard[]
+
+  @@index([clubId])
+}
+
+model MemberCard {
+  id          String   @id @default(cuid())
+  currentPage Int      @default(0)
+  comment     String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  phaseId String
+  phase   ReadingPhase @relation(fields: [phaseId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, phaseId])
+  @@index([phaseId])
+}
+
+model Question {
+  id           String         @id @default(cuid())
+  content      String
+  isPinned     Boolean        @default(false)
+  upvotesCount Int            @default(0)
+  status       QuestionStatus @default(PROPOSED)
+  isArchived   Boolean        @default(false)
+  createdAt    DateTime       @default(now())
+  updatedAt    DateTime       @updatedAt
+
+  phaseId String
+  phase   ReadingPhase @relation(fields: [phaseId], references: [id], onDelete: Cascade)
+
+  authorId String
+  author   User   @relation(fields: [authorId], references: [id])
+
+  answers   Answer[]
+  votes     Vote[]
+  reactions Reaction[]
+
+  @@index([phaseId])
+  @@index([authorId])
+}
+
+model Answer {
+  id        String   @id @default(cuid())
+  content   String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  questionId String
+  question   Question @relation(fields: [questionId], references: [id], onDelete: Cascade)
+
+  authorId String
+  author   User   @relation(fields: [authorId], references: [id])
+
+  // Self-relation for threaded replies
+  parentId String?
+  parent   Answer?  @relation("AnswerReplies", fields: [parentId], references: [id], onDelete: Cascade)
+  replies  Answer[] @relation("AnswerReplies")
+
+  @@index([questionId])
+  @@index([parentId])
+  @@index([authorId])
+}
+
+model Vote {
+  id        String   @id @default(cuid())
+  createdAt DateTime @default(now())
+
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  questionId String
+  question   Question @relation(fields: [questionId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, questionId])
+  @@index([questionId])
+}
+
+model Reaction {
+  id         String   @id @default(cuid())
+  emoji      String
+  userId     String
+  questionId String
+  createdAt  DateTime @default(now())
+
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  question   Question @relation(fields: [questionId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, questionId, emoji])
+  @@index([questionId])
+}
