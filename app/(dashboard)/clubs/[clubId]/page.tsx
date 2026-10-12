@@ -8,6 +8,8 @@ import { EditClubDialog } from '@/components/clubs/edit-club-dialog'
 import { InviteCopyButton } from '@/components/clubs/invite-copy-button'
 import { LaunchClubDialog } from '@/components/clubs/launch-club-dialog'
 import { PhasesView } from '@/components/clubs/phases-view'
+import { ProgressPanel } from '@/components/clubs/progress-panel'
+import { getClubProgress } from '@/lib/actions/progress.actions'
 import { getQuestionsByPhase } from '@/lib/actions/question.actions'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 
@@ -50,7 +52,7 @@ export default async function ClubPage({
       club.readingPhases[club.readingPhases.length - 1] ??
       null
 
-    const [initialMemberCards, initialQuestions] = await Promise.all([
+    const [initialMemberCards, initialQuestions, progressResult] = await Promise.all([
       currentPhase
         ? db.memberCard.findMany({
             where: { phaseId: currentPhase.id },
@@ -60,12 +62,14 @@ export default async function ClubPage({
       currentPhase
         ? getQuestionsByPhase(currentPhase.id)
         : Promise.resolve([]),
+      activeTab === 'progress' ? getClubProgress(clubId) : Promise.resolve(null),
     ])
 
     const currentPhaseNumber = currentPhase ? currentPhase.weekIndex + 1 : club.numberOfWeeks
 
     const tabs = [
       { label: 'Phases', value: 'phases' },
+      { label: 'Progress', value: 'progress' },
       { label: 'Overview', value: 'overview' },
       { label: 'Grand Library', value: 'library' },
     ]
@@ -125,6 +129,20 @@ export default async function ClubPage({
             />
           ) : (
             <p className="text-sm text-muted-foreground">No phases are available yet.</p>
+          ))}
+
+        {/* Progress tab */}
+        {activeTab === 'progress' &&
+          (progressResult && 'success' in progressResult ? (
+            <ProgressPanel
+              clubId={clubId}
+              currentUserId={session.user.id}
+              openPhaseId={club.readingPhases.find((p) => p.isOpen)?.id ?? null}
+              members={club.memberships.map((m) => ({ id: m.user.id, name: m.user.name }))}
+              initialProgress={progressResult.data}
+            />
+          ) : (
+            <p className="text-sm text-muted-foreground">Progress is not available.</p>
           ))}
 
         {/* Overview tab */}

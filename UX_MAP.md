@@ -206,3 +206,10 @@ Phases tab is hidden — reading is complete.
 | Ask Question | Question Pool "Ask Question" button | Question textarea + submit |
 | Question Detail | Clicking a question in the Pool | Full question, votes, reactions |
 | Close Phase | Admin "Close Phase" button | Top question suggestions, Admin confirms selection |
+
+## Progress tab (ACTIVE clubs)
+
+`/clubs/[clubId]?tab=progress` — one card per reading week with the share of members who finished
+it and each member's progress bar. A member who finished the open week's pages can press
+**I finished this week's reading**, which sets their card to the phase's last page. The same data
+is served as JSON at `GET /api/clubs/[clubId]/progress` for the weekly digest email.
