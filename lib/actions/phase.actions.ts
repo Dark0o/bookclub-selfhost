@@ -9,6 +9,8 @@ import {
   type UpdateMemberCardInput,
   closePhaseSchema,
   type ClosePhaseInput,
+  markPhaseFinishedSchema,
+  type MarkPhaseFinishedInput,
 } from '@/lib/validations'
 
 export const getMemberCards = async (phaseId: string) => {
@@ -101,4 +103,37 @@ export const closePhase = async (input: ClosePhaseInput): Promise<{ success: tru
   } catch {
     return { error: 'Failed to close phase. Please try again.' }
   }
+}
+
+type MarkPhaseFinishedResult = { success: true } | { error: string }
+
+/** Sets the member's card to the phase's last page ("I finished this week's reading"). */
+export const markPhaseFinished = async (
+  input: MarkPhaseFinishedInput
+): Promise<MarkPhaseFinishedResult> => {
+  const session = await auth.api.getSession({ headers: await headers() })
+  if (!session) return { error: 'Unauthorized' }
+
+  const parsed = markPhaseFinishedSchema.safeParse(input)
+  if (!parsed.success) return { error: 'Invalid input' }
+
+  const { phaseId } = parsed.data
+
+  const phase = await db.readingPhase.findUnique({
+    where: { id: phaseId },
+    include: {
+      club: { include: { memberships: { where: { userId: session.user.id } } } },
+    },
+  })
+  if (!phase) return { error: 'Phase not found' }
+  if (phase.club.memberships.length === 0) return { error: 'Not a member' }
+  if (!phase.isOpen) return { error: 'Phase is not open' }
+
+  await db.memberCard.update({
+    where: { userId_phaseId: { userId: session.user.id, phaseId } },
+    data: { currentPage: phase.endUnit },
+  })
+
+  revalidatePath(`/clubs/${phase.clubId}`)
+  return { success: true }
 }

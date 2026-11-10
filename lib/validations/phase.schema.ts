@@ -14,3 +14,9 @@ export const closePhaseSchema = z.object({
 })
 
 export type ClosePhaseInput = z.infer<typeof closePhaseSchema>
+
+export const markPhaseFinishedSchema = z.object({
+  phaseId: z.string().cuid(),
+})
+
+export type MarkPhaseFinishedInput = z.infer<typeof markPhaseFinishedSchema>
